@@ -22,11 +22,14 @@ func TestListenServe(t *testing.T) {
 			log.Println("accept connectino from:", conn.RemoteAddr())
 			go func() {
 				var buf = make([]byte, 512)
-				if _, e := conn.Read(buf); err != nil {
+				if n, e := conn.Read(buf); err != nil {
 					log.Println(e)
 				} else {
+					log.Println("read:", n)
 					peek := NewPeek()
-					peek.SetBuf(&buf)
+					buf = buf[:n]
+					peek.SetBuf(buf)
+					log.Println(string(buf))
 					t := peek.Parse()
 					log.Println(t, peek.Hostname)
 					//log.Println(string(buf))

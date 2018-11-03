@@ -9,7 +9,6 @@ const (
 	HTTP = iota
 	HTTPS
 	SSH
-	NORMALTCP
 	UNKNOWN
 )
 
@@ -19,7 +18,7 @@ const (
 )
 
 type Peek struct {
-	data     *[]byte
+	data     []byte
 	Hostname string
 	Type     int
 }
@@ -29,18 +28,18 @@ func NewPeek() *Peek {
 	return &p
 }
 
-func (p *Peek) SetBuf(data *[]byte) {
+func (p *Peek) SetBuf(data []byte) {
 	p.data = data
 }
 
 func (p *Peek) Parse() int {
 	switch {
-	case p.isHTTP():
-		log.Println("http")
-		return HTTP
 	case p.isHTTPS():
 		log.Println("https")
 		return HTTPS
+	case p.isHTTP():
+		log.Println("http")
+		return HTTP
 	case p.isSSH():
 		log.Println("ssh")
 		return SSH
@@ -50,11 +49,11 @@ func (p *Peek) Parse() int {
 	}
 }
 func (p *Peek) isSSH() bool {
-	return strings.Contains(SSHPATTAN, string((*p.data)[:4]))
+	return strings.Contains(SSHPATTAN, string(p.data[:4]))
 }
 
 func (p *Peek) isHTTP() bool {
-	if strings.Contains(HTTPPATTAN, strings.TrimSpace(string((*p.data)[:4]))) {
+	if strings.Contains(HTTPPATTAN, strings.TrimSpace(string(p.data[:4]))) {
 		p.parseHTTPHostname()
 		return true
 	} else {
@@ -63,7 +62,7 @@ func (p *Peek) isHTTP() bool {
 }
 
 func (p *Peek) isHTTPS() bool {
-	if (*p.data)[0] == 0x16 {
+	if p.data[0] == 0x16 {
 		p.parseHTTPSHostname()
 		return true
 	} else {
@@ -74,9 +73,9 @@ func (p *Peek) isHTTPS() bool {
 func (p *Peek) parseHTTPHostname() {
 	s := 0
 	var line string
-	for i, b := range *p.data {
+	for i, b := range p.data {
 		if b == byte('\n') {
-			line = strings.TrimSpace(string((*p.data)[s:i]))
+			line = strings.TrimSpace(string(p.data[s:i]))
 			if strings.HasPrefix(line, "Host:") {
 				hostname := strings.TrimSpace(strings.Split(line, ":")[1])
 				p.Hostname = hostname
@@ -93,27 +92,35 @@ func (p *Peek) parseHTTPSHostname() {
 }
 
 func (p *Peek) parseSNIHostname() {
+	dataLen := len(p.data)
+	if dataLen < 128 {
+		return
+	}
 	// Simple SNI Protocol : SNI Handling Code from https://github.com/gpjt/stupid-proxy/
 	//firstbyte
 	current := 0
-	if (*p.data)[0] != 0x16 {
+	if p.data[0] != 0x16 {
 		log.Printf("Not TLS :-(")
 		return
 	}
 
 	current++
 	//version bytes
-	if (*p.data)[current] < 3 || ((*p.data)[current] == 3 && (*p.data)[current+1] < 1) {
-		log.Printf("SSL < 3.1 so it's still not TLS v%d.%d", (*p.data)[current], (*p.data)[current+1])
+	if p.data[current] < 3 || (p.data[current] == 3 && p.data[current+1] < 1) {
+		log.Printf("SSL < 3.1 so it's still not TLS v%d.%d", p.data[current], p.data[current+1])
 		return
 	}
 	current += 2
 
 	//resetLength
-	restLength := (int((*p.data)[current]) << 8) + int((*p.data)[current+1])
+	restLength := (int(p.data[current]) << 8) + int(p.data[current+1])
 	current += 2
 
-	handshakeType := (*p.data)[current]
+	if current > dataLen {
+		return
+	}
+
+	handshakeType := p.data[current]
 	current += 1
 	if handshakeType != 0x1 {
 		log.Printf("Not a ClientHello")
@@ -127,18 +134,27 @@ func (p *Peek) parseSNIHostname() {
 	// Skip over random number
 	current += 4 + 28
 	// Skip over session ID
-	sessionIDLength := int((*p.data)[current])
+	sessionIDLength := int(p.data[current])
 	current += 1
 	current += sessionIDLength
 
-	cipherSuiteLength := (int((*p.data)[current]) << 8) + int((*p.data)[current+1])
+	if current > dataLen {
+		return
+	}
+	cipherSuiteLength := (int(p.data[current]) << 8) + int(p.data[current+1])
 	current += 2
 	current += cipherSuiteLength
 
-	compressionMethodLength := int((*p.data)[current])
+	if current > dataLen {
+		return
+	}
+	compressionMethodLength := int(p.data[current])
 	current += 1
 	current += compressionMethodLength
 
+	if current > dataLen {
+		return
+	}
 	if current > restLength {
 		log.Println("no extensions")
 		return
@@ -149,25 +165,25 @@ func (p *Peek) parseSNIHostname() {
 	current += 2
 	var hostname string
 	for current < restLength && hostname == "" {
-		extensionType := (int((*p.data)[current]) << 8) + int((*p.data)[current+1])
+		extensionType := (int(p.data[current]) << 8) + int(p.data[current+1])
 		current += 2
 
-		extensionDataLength := (int((*p.data)[current]) << 8) + int((*p.data)[current+1])
+		extensionDataLength := (int(p.data[current]) << 8) + int(p.data[current+1])
 		current += 2
 
 		if extensionType == 0 {
 			// Skip over number of names as we're assuming there's just one
 			current += 2
 
-			nameType := (*p.data)[current]
+			nameType := p.data[current]
 			current += 1
 			if nameType != 0 {
 				log.Printf("Not a hostname")
 				return
 			}
-			nameLen := (int((*p.data)[current]) << 8) + int((*p.data)[current+1])
+			nameLen := (int(p.data[current]) << 8) + int(p.data[current+1])
 			current += 2
-			hostname = string((*p.data)[current : current+nameLen])
+			hostname = string(p.data[current : current+nameLen])
 		}
 
 		current += extensionDataLength
