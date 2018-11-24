@@ -1,8 +1,9 @@
 package peektype
 
 import (
-	"log"
 	"strings"
+
+	"github.com/linexjlin/simple-log"
 )
 
 const (
