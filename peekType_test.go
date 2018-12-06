@@ -1,9 +1,10 @@
 package peektype
 
 import (
-	"log"
 	"net"
 	"testing"
+
+	"github.com/linexjlin/simple-log"
 )
 
 func TestListenServe(t *testing.T) {
@@ -30,6 +31,7 @@ func TestListenServe(t *testing.T) {
 					buf = buf[:n]
 					peek.SetBuf(buf)
 					log.Println(string(buf))
+					log.Println(buf)
 					t := peek.Parse()
 					log.Println(t, peek.Hostname)
 					//log.Println(string(buf))

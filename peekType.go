@@ -46,6 +46,7 @@ func (p *Peek) Parse() int {
 		return SSH
 	default:
 		log.Println("UNKNOWN")
+		log.Debug(string(p.data))
 		return UNKNOWN
 	}
 }
