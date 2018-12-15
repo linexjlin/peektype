@@ -166,7 +166,10 @@ func (p *Peek) parseSNIHostname() {
 	// extensionsLength := (int(rest[current]) << 8) + int(rest[current + 1])
 	current += 2
 	var hostname string
-	for current+3 < restLength && hostname == "" {
+	for current+3 < restLength {
+		if current+9 < len(p.data) {
+			return
+		}
 		extensionType := (int(p.data[current]) << 8) + int(p.data[current+1])
 		current += 2
 
