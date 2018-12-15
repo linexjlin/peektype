@@ -168,6 +168,7 @@ func (p *Peek) parseSNIHostname() {
 	var hostname string
 	for current+3 < restLength {
 		if current+9 < len(p.data) {
+			log.Printf("No hostname")
 			return
 		}
 		extensionType := (int(p.data[current]) << 8) + int(p.data[current+1])
@@ -189,15 +190,10 @@ func (p *Peek) parseSNIHostname() {
 			nameLen := (int(p.data[current]) << 8) + int(p.data[current+1])
 			current += 2
 			hostname = string(p.data[current : current+nameLen])
+			p.Hostname = hostname
+			return
 		}
 
 		current += extensionDataLength
-	}
-
-	if hostname == "" {
-		log.Printf("No hostname")
-		return
-	} else {
-		p.Hostname = hostname
 	}
 }
