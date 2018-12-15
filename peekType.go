@@ -167,7 +167,7 @@ func (p *Peek) parseSNIHostname() {
 	current += 2
 	var hostname string
 	for current+3 < restLength {
-		if current+9 < len(p.data) {
+		if current+9 > len(p.data) {
 			log.Printf("No hostname")
 			return
 		}
