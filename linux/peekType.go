@@ -63,14 +63,14 @@ func Peek(c net.Conn) (int, string, error) {
 		if hostname == "" {
 			return UNKNOWN, "", errors.New("Unknown type")
 		}
-		return HTTP, parseHTTPHostname(buf), nil
+		return HTTP, hostname, nil
 	case isHTTPS(buf):
 		log.Println("https")
-		hostname = parseHTTPHostname(buf)
+		hostname = parseSNIHostname(buf)
 		if hostname == "" {
 			return UNKNOWN, "", errors.New("Unknown type")
 		}
-		return HTTPS, parseSNIHostname(buf), nil
+		return HTTPS, hostname, nil
 	default:
 		log.Println("UNKNOWN")
 		return UNKNOWN, "", errors.New("Unknown type")
